@@ -3,16 +3,10 @@ import re
 import telebot
 from flask import Flask, request
 
-# البوت يقرأ التوكن من إعدادات Render
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
-
-# ==========================================
-# [ الإعدادات النهائية جاهزة ]
-# ==========================================
-ADMIN_IDS = [776941096]  # الآيدي حقك
-FORCE_CHANNEL = "@AmirDarkChannel"  # رابط قناتك
+ADMIN_IDS = [776941096] 
+FORCE_CHANNEL = "@AmirDarkChannel" 
 BANNED_WORDS = ["سبام", "scam", "نصب"]
-# ==========================================
 
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -39,25 +33,42 @@ def welcome_new_member(message):
 
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def filter_messages(message):
-    if message.from_user.id in ADMIN_IDS: return
+    # 1. استثناء المشرفين
+    if message.from_user.id in ADMIN_IDS: 
+        print(f"[*] Admin message from {message.from_user.id} - Ignored.")
+        return
+    
+    # 2. فحص الانضمام للقناة (مع طباعة الخطأ)
     try:
         member = bot.get_chat_member(FORCE_CHANNEL, message.from_user.id)
         if member.status in ['left', 'kicked']:
             bot.delete_message(message.chat.id, message.message_id)
             bot.send_message(message.chat.id, f"@{message.from_user.username}، عذراً يجب عليك الانضمام للقناة أولاً: {FORCE_CHANNEL}")
+            print(f"[+] Deleted message: User not in channel.")
             return
-    except Exception: pass
-
+    except Exception as e:
+        print(f"[!] Force Join Error: {e}") # هنا راح يطبع لنا المشكلة بالضبط
+    
+    # 3. فحص الروابط
     link_regex = r'(https?://|t\.me/|www\.)'
     if re.search(link_regex, message.text, re.IGNORECASE):
-        bot.delete_message(message.chat.id, message.message_id)
-        bot.send_message(message.chat.id, f"🚫 @{message.from_user.username}، إرسال الروابط ممنوع!")
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+            bot.send_message(message.chat.id, f"🚫 @{message.from_user.username}، إرسال الروابط ممنوع!")
+            print(f"[+] Deleted message: Link detected.")
+        except Exception as e:
+            print(f"[!] Delete Link Error: {e}")
         return
 
+    # 4. فحص الكلمات الممنوعة
     for word in BANNED_WORDS:
         if word.lower() in message.text.lower():
-            bot.delete_message(message.chat.id, message.message_id)
-            bot.send_message(message.chat.id, f"🚫 @{message.from_user.username}، يرجى الالتزام بآداب الحوار!")
+            try:
+                bot.delete_message(message.chat.id, message.message_id)
+                bot.send_message(message.chat.id, f"🚫 @{message.from_user.username}، يرجى الالتزام بآداب الحوار!")
+                print(f"[+] Deleted message: Banned word detected.")
+            except Exception as e:
+                print(f"[!] Delete Word Error: {e}")
             return
 
 if __name__ == "__main__":
