@@ -4,7 +4,7 @@ import telebot
 from flask import Flask, request
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
-ADMIN_IDS = [776941096] 
+ADMIN_IDS = [] 
 FORCE_CHANNEL = "@AmirDarkChannel" 
 BANNED_WORDS = ["سبام", "scam", "نصب"]
 
