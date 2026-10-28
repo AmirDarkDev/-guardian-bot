@@ -6,9 +6,9 @@ from flask import Flask, request
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 
 # ==========================================
-# [ مسحنا رقمك عشان تختبر بنفسك ]
+# [ رقمك رجع كمدير ]
 # ==========================================
-ADMIN_IDS = [] 
+ADMIN_IDS = [776941096] 
 FORCE_CHANNEL = "@AmirDarkChannel" 
 BANNED_WORDS = ["سبام", "scam", "نصب"]
 # ==========================================
@@ -27,11 +27,22 @@ def getMessage():
         message = update.message
         print(f"[DEBUG] Message caught! Text: {message.text}", flush=True)
 
-        # 1. استثناء المشرفين (الحين فاضي)
+        # 1. استثناء المشرفين (أنت)
         if message.from_user.id in ADMIN_IDS: 
             print("[*] Admin message - Ignored.", flush=True)
         else:
-            # 2. فحص الروابط
+            # 2. الفحص الأول: الانضمام الإجباري للقناة
+            try:
+                member = bot.get_chat_member(FORCE_CHANNEL, message.from_user.id)
+                if member.status in ['left', 'kicked']:
+                    bot.delete_message(message.chat.id, message.message_id)
+                    bot.send_message(message.chat.id, f"@{message.from_user.username}، عذراً يجب عليك الانضمام للقناة أولاً: {FORCE_CHANNEL}")
+                    print(f"[+] Deleted message: User not in channel.", flush=True)
+                    return
+            except Exception as e:
+                print(f"[!] Force Join Error: {e}", flush=True)
+
+            # 3. الفحص الثاني: الروابط
             link_regex = r'(https?://|t\.me/|www\.)'
             if re.search(link_regex, message.text, re.IGNORECASE):
                 try:
@@ -40,8 +51,9 @@ def getMessage():
                     print(f"[+] Deleted message: Link detected.", flush=True)
                 except Exception as e:
                     print(f"[!] Delete Error: {e}", flush=True)
+                return
             
-            # 3. فحص الكلمات الممنوعة
+            # 4. الفحص الثالث: الكلمات الممنوعة
             elif any(word.lower() in message.text.lower() for word in BANNED_WORDS):
                 try:
                     bot.delete_message(message.chat.id, message.message_id)
@@ -49,17 +61,7 @@ def getMessage():
                     print(f"[+] Deleted message: Banned word.", flush=True)
                 except Exception as e:
                     print(f"[!] Delete Error: {e}", flush=True)
-            
-            # 4. فحص الانضمام الإجباري
-            else:
-                try:
-                    member = bot.get_chat_member(FORCE_CHANNEL, message.from_user.id)
-                    if member.status in ['left', 'kicked']:
-                        bot.delete_message(message.chat.id, message.message_id)
-                        bot.send_message(message.chat.id, f"@{message.from_user.username}، عذراً يجب عليك الانضمام للقناة أولاً: {FORCE_CHANNEL}")
-                        print(f"[+] Deleted message: User not in channel.", flush=True)
-                except Exception as e:
-                    print(f"[!] Force Join Error: {e}", flush=True)
+                return
 
     return "!", 200
 
