@@ -6,7 +6,7 @@ from flask import Flask, request
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 
 # ==========================================
-# [ رقمك رجع كمدير ]
+# [ الإعدادات النهائية ]
 # ==========================================
 ADMIN_IDS = [776941096] 
 FORCE_CHANNEL = "@AmirDarkChannel" 
@@ -27,16 +27,19 @@ def getMessage():
         message = update.message
         print(f"[DEBUG] Message caught! Text: {message.text}", flush=True)
 
-        # 1. استثناء المشرفين (أنت)
+        # 1. استثناء المشرفين
         if message.from_user.id in ADMIN_IDS: 
             print("[*] Admin message - Ignored.", flush=True)
         else:
+            # نحدد اسم الشخص اللي راح يناديه البوت (يوزر أو اسم أول)
+            user_mention = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
+
             # 2. الفحص الأول: الانضمام الإجباري للقناة
             try:
                 member = bot.get_chat_member(FORCE_CHANNEL, message.from_user.id)
                 if member.status in ['left', 'kicked']:
                     bot.delete_message(message.chat.id, message.message_id)
-                    bot.send_message(message.chat.id, f"@{message.from_user.username}، عذراً يجب عليك الانضمام للقناة أولاً: {FORCE_CHANNEL}")
+                    bot.send_message(message.chat.id, f"{user_mention}، عذراً يجب عليك الانضمام للقناة أولاً: {FORCE_CHANNEL}")
                     print(f"[+] Deleted message: User not in channel.", flush=True)
                     return
             except Exception as e:
@@ -47,7 +50,7 @@ def getMessage():
             if re.search(link_regex, message.text, re.IGNORECASE):
                 try:
                     bot.delete_message(message.chat.id, message.message_id)
-                    bot.send_message(message.chat.id, f"🚫 @{message.from_user.username}، إرسال الروابط ممنوع!")
+                    bot.send_message(message.chat.id, f"🚫 {user_mention}، إرسال الروابط ممنوع!")
                     print(f"[+] Deleted message: Link detected.", flush=True)
                 except Exception as e:
                     print(f"[!] Delete Error: {e}", flush=True)
@@ -57,7 +60,7 @@ def getMessage():
             elif any(word.lower() in message.text.lower() for word in BANNED_WORDS):
                 try:
                     bot.delete_message(message.chat.id, message.message_id)
-                    bot.send_message(message.chat.id, f"🚫 @{message.from_user.username}، يرجى الالتزام بآداب الحوار!")
+                    bot.send_message(message.chat.id, f"🚫 {user_mention}، يرجى الالتزام بآداب الحوار!")
                     print(f"[+] Deleted message: Banned word.", flush=True)
                 except Exception as e:
                     print(f"[!] Delete Error: {e}", flush=True)
