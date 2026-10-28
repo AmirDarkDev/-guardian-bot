@@ -33,12 +33,13 @@ def welcome_new_member(message):
 
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def filter_messages(message):
-    # 1. استثناء المشرفين
+    # هذا السطر راح يطبع لنا كل رسالة تدخل البوت عشان نتأكد
+    print(f"[DEBUG] Received message from {message.from_user.id}: {message.text}")
+
     if message.from_user.id in ADMIN_IDS: 
-        print(f"[*] Admin message from {message.from_user.id} - Ignored.")
+        print(f"[*] Admin message - Ignored.")
         return
     
-    # 2. فحص الانضمام للقناة (مع طباعة الخطأ)
     try:
         member = bot.get_chat_member(FORCE_CHANNEL, message.from_user.id)
         if member.status in ['left', 'kicked']:
@@ -47,9 +48,8 @@ def filter_messages(message):
             print(f"[+] Deleted message: User not in channel.")
             return
     except Exception as e:
-        print(f"[!] Force Join Error: {e}") # هنا راح يطبع لنا المشكلة بالضبط
+        print(f"[!] Force Join Error: {e}") 
     
-    # 3. فحص الروابط
     link_regex = r'(https?://|t\.me/|www\.)'
     if re.search(link_regex, message.text, re.IGNORECASE):
         try:
@@ -60,7 +60,6 @@ def filter_messages(message):
             print(f"[!] Delete Link Error: {e}")
         return
 
-    # 4. فحص الكلمات الممنوعة
     for word in BANNED_WORDS:
         if word.lower() in message.text.lower():
             try:
