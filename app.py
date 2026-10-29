@@ -2,6 +2,7 @@ import os
 import re
 import random
 import time
+import threading
 import telebot
 from flask import Flask, request
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
@@ -38,6 +39,22 @@ warn_cooldown = {}
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
+# ==========================================
+# [ دالة فك الكتم التلقائي بعد 10 دقائق ]
+# ==========================================
+def unmute_user_after_delay(chat_id, user_id):
+    time.sleep(600) # 600 ثانية = 10 دقائق
+    try:
+        bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(
+            can_send_messages=True, 
+            can_send_media_messages=True, 
+            can_send_other_messages=True, 
+            can_add_web_page_previews=True
+        ))
+        bot.send_message(chat_id, "🔊 تم فك الكتم تلقائياً بعد 10 دقائق. يمكنك المشاركة الآن | User has been unmuted.")
+    except Exception as e:
+        print(f"Unmute Error: {e}")
+
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def getMessage():
     json_string = request.get_data().decode('utf-8')
@@ -50,7 +67,6 @@ def getMessage():
         for member in update.message.new_chat_members:
             if member.is_bot: continue
             
-            # رسالة الترحيب الفورية
             welcome_text = (
                 f"🇾🇪 أهلاً وسهلاً بك {member.first_name} في درع الظلام 🛡️\n\n"
                 f"⚠️ للتمكن من المشاركة في المجموعة، يرجى الانضمام إلى قناتنا الرسمية أولاً:\n"
@@ -136,7 +152,7 @@ def getMessage():
         violation = False
         warning_msg = ""
 
-        # أ. فحص الانضمام للقناة (إذا أرسل رسالة وهو مو منضم)
+        # أ. فحص الانضمام للقناة
         try:
             member = bot.get_chat_member(FORCE_CHANNEL, user_id)
             if member.status in ['left', 'kicked']:
@@ -153,7 +169,7 @@ def getMessage():
             violation = True
             warning_msg = f"🚫 {user_mention}، يرجى الالتزام بآداب الحوار!"
 
-        # تطبيق الإنذار
+        # تطبيق الإنذار والكتم
         if violation:
             try: bot.delete_message(chat_id, message.message_id)
             except: pass
@@ -165,12 +181,19 @@ def getMessage():
             warn_cooldown[user_id] = current_time
             user_warnings[user_id] = user_warnings.get(user_id, 0) + 1
             
+            # إذا وصل لـ 3 إنذارات.. كتم 10 دقائق بدل الطرد
             if user_warnings[user_id] >= 3:
                 try:
-                    bot.ban_chat_member(chat_id, user_id)
-                    bot.send_message(chat_id, f"🚷 {user_mention} تم طرده لتجاوزه 3 إنذارات.\n🚷 {user_mention} has been banned (3 warnings).")
+                    # كتم العضو
+                    bot.restrict_chat_member(chat_id, user_id, permissions=ChatPermissions(can_send_messages=False))
+                    bot.send_message(chat_id, f"🔇 {user_mention} تم كتمه لمدة 10 دقائق لتجاوزه 3 إنذارات.\n🔇 {user_mention} has been muted for 10 minutes (3 warnings).")
                     user_warnings[user_id] = 0
-                except: pass
+                    
+                    # تشغيل مؤقت فك الكتم في الخلفية
+                    threading.Thread(target=unmute_user_after_delay, args=(chat_id, user_id)).start()
+                    
+                except Exception as e:
+                    print(f"Mute Error: {e}")
             else:
                 try:
                     bot.send_message(chat_id, f"{warning_msg}\n⚠️ إنذار {user_warnings[user_id]}/3 | Warning {user_warnings[user_id]}/3")
