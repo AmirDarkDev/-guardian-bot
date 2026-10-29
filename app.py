@@ -75,21 +75,28 @@ def getMessage():
             elif message.text.startswith('/ban') and message.reply_to_message:
                 try: bot.ban_chat_member(chat_id, message.reply_to_message.from_user.id)
                 except: pass
-                bot.reply_to(message, "✅ تم طرد العضو | User banned.")
+                try: bot.reply_to(message, "✅ تم طرد العضو | User banned.")
+                except: pass
                 return "!", 200
+                
             elif message.text.startswith('/mute') and message.reply_to_message:
                 try: bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=False))
                 except: pass
-                bot.reply_to(message, "🔇 تم كتم العضو | User muted.")
+                try: bot.reply_to(message, "🔇 تم كتم العضو | User muted.")
+                except: pass
                 return "!", 200
+                
             elif message.text.startswith('/unmute') and message.reply_to_message:
                 try: bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True))
                 except: pass
-                bot.reply_to(message, "🔊 تم فك الكتم | User unmuted.")
+                try: bot.reply_to(message, "🔊 تم فك الكتم | User unmuted.")
+                except: pass
                 return "!", 200
+                
             elif message.text.startswith('/resetwarn') and message.reply_to_message:
                 user_warnings[message.reply_to_message.from_user.id] = 0
-                bot.reply_to(message, "🔄 تم مسح إنذارات العضو | Warnings reset.")
+                try: bot.reply_to(message, "🔄 تم مسح إنذارات العضو | Warnings reset.")
+                except: pass
                 return "!", 200
 
         # 2. الردود التلقائية (Auto-Replies)
@@ -135,8 +142,8 @@ def getMessage():
         if violation:
             try:
                 bot.delete_message(chat_id, message.message_id)
-            except Exception as e:
-                print(f"[!] Delete Error: {e}", flush=True) # لو الرسالة محذوفة، البوت يكمل عادي
+            except: 
+                pass # هنا تم إخفاء الخطأ نهائياً
 
             user_warnings[user_id] = user_warnings.get(user_id, 0) + 1
             
