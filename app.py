@@ -1,6 +1,7 @@
 import os
 import re
 import random
+import time
 import telebot
 from flask import Flask, request
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatPermissions
@@ -11,7 +12,7 @@ FORCE_CHANNEL = "@AmirDarkChannel"
 BANNED_WORDS = ["سبام", "scam", "نصب", "bot", "قمار"]
 
 # ==========================================
-# [ الردود التلقائية - عربي وإنجليزي ]
+# [ الردود التلقائية ]
 # ==========================================
 AUTO_REPLIES = {
     "السلام عليكم": "وعليكم السلام ورحمة الله وبركاته 🌸",
@@ -23,7 +24,6 @@ AUTO_REPLIES = {
     "thanks": "You're welcome! 🤍",
 }
 
-# ردود ذكية للمنشن (Mention Replies)
 MENTION_REPLIES = [
     "نعم يا طيب؟ أنا درع الظلام، تحت أمرك 🛡️",
     "أنا هنا لحماية المجموعة، كيف أقدر أساعدك؟",
@@ -32,8 +32,8 @@ MENTION_REPLIES = [
     "How can I help you? Type /help for features."
 ]
 
-# نظام الإنذارات (Warning System)
 user_warnings = {}
+warn_cooldown = {}
 
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -43,15 +43,31 @@ def getMessage():
     json_string = request.get_data().decode('utf-8')
     update = telebot.types.Update.de_json(json_string)
     
+    # ==========================================
+    # 1. الترحيب الفوري بمجرد دخول العضو
+    # ==========================================
     if update.message and update.message.new_chat_members:
         for member in update.message.new_chat_members:
             if member.is_bot: continue
-            welcome_text = f"🇾🇪 أهلاً بك {member.first_name} في درع الظلام 🛡️\n⚠️ يجب عليك الانضمام لقناتنا أولاً: {FORCE_CHANNEL}\n\n🇬🇧 Welcome {member.first_name} to Dark Shield 🛡️\n⚠️ Join our channel: {FORCE_CHANNEL}"
-            try:
+            
+            # رسالة الترحيب الفورية
+            welcome_text = (
+                f"🇾🇪 أهلاً وسهلاً بك {member.first_name} في درع الظلام 🛡️\n\n"
+                f"⚠️ للتمكن من المشاركة في المجموعة، يرجى الانضمام إلى قناتنا الرسمية أولاً:\n"
+                f"👉 {FORCE_CHANNEL}\n\n"
+                f"🇬🇧 Welcome {member.first_name} to Dark Shield 🛡️\n"
+                f"⚠️ You must join our channel to chat:\n"
+                f"👉 {FORCE_CHANNEL}"
+            )
+            try: 
                 bot.send_message(update.message.chat.id, welcome_text)
-            except: pass
+            except Exception as e: 
+                print(f"Welcome Error: {e}")
         return "!", 200
 
+    # ==========================================
+    # 2. معالجة الرسائل النصية
+    # ==========================================
     if update.message and update.message.text:
         message = update.message
         text_lower = message.text.lower()
@@ -59,53 +75,51 @@ def getMessage():
         chat_id = message.chat.id
         user_mention = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
         
-        # 1. أوامر الإدارة
-        if user_id in ADMIN_IDS:
-            if message.text == '/start' or message.text == '/help':
-                markup = InlineKeyboardMarkup()
-                btn_add = InlineKeyboardButton("➕ أضفني لمجموعتك | Add to Group", url=f"https://t.me/{bot.get_me().username}?startgroup=true")
-                btn_contact = InlineKeyboardButton("👨‍💻 المطور | Developer", url="https://t.me/AmirDarkDev")
-                markup.add(btn_add, btn_contact)
-                help_text = "🛡️ *درع الظلام | Dark Shield*\n\n🛠️ *أوامر الإدارة:*\n`/ban` - طرد\n`/mute` - كتم\n`/unmute` - فك كتم\n`/resetwarn` - مسح إنذارات العضو\n\n💵 السعر: 15$ | 📩 @AmirDarkDev"
-                try:
-                    bot.send_message(chat_id, help_text, parse_mode='Markdown', reply_markup=markup)
-                except: pass
-                return "!", 200
+        # أمر /start و /help
+        if message.text == '/start' or message.text == '/help':
+            markup = InlineKeyboardMarkup()
+            btn_add = InlineKeyboardButton("➕ أضفني لمجموعتك | Add to Group", url="https://t.me/ameraldlembot?startgroup=true")
+            btn_contact = InlineKeyboardButton("👨‍💻 المطور | Developer", url="https://t.me/AmirDarkDev")
+            markup.add(btn_add, btn_contact)
+            help_text = "🛡️ *درع الظلام | Dark Shield*\n\n🛠️ *أوامر الإدارة:*\n`/ban` - طرد\n`/mute` - كتم\n`/unmute` - فك كتم\n`/resetwarn` - مسح إنذارات العضو\n\n💵 السعر: 15$ | 📩 @AmirDarkDev"
+            try: bot.send_message(chat_id, help_text, parse_mode='Markdown', reply_markup=markup)
+            except: pass
+            return "!", 200
 
-            elif message.text.startswith('/ban') and message.reply_to_message:
+        # أوامر الإدارة
+        if user_id in ADMIN_IDS:
+            if message.text.startswith('/ban') and message.reply_to_message:
                 try: bot.ban_chat_member(chat_id, message.reply_to_message.from_user.id)
                 except: pass
                 try: bot.reply_to(message, "✅ تم طرد العضو | User banned.")
                 except: pass
                 return "!", 200
-                
             elif message.text.startswith('/mute') and message.reply_to_message:
                 try: bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=False))
                 except: pass
                 try: bot.reply_to(message, "🔇 تم كتم العضو | User muted.")
                 except: pass
                 return "!", 200
-                
             elif message.text.startswith('/unmute') and message.reply_to_message:
                 try: bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True))
                 except: pass
                 try: bot.reply_to(message, "🔊 تم فك الكتم | User unmuted.")
                 except: pass
                 return "!", 200
-                
             elif message.text.startswith('/resetwarn') and message.reply_to_message:
                 user_warnings[message.reply_to_message.from_user.id] = 0
+                warn_cooldown[message.reply_to_message.from_user.id] = 0
                 try: bot.reply_to(message, "🔄 تم مسح إنذارات العضو | Warnings reset.")
                 except: pass
                 return "!", 200
 
-        # 2. الردود التلقائية (Auto-Replies)
+        # الردود التلقائية
         for trigger, response in AUTO_REPLIES.items():
             if trigger.lower() in text_lower:
                 try: bot.reply_to(message, response)
                 except: pass
 
-        # 3. الرد الذكي على المنشن (Mention Reply)
+        # الرد على المنشن
         if f"@{bot.get_me().username}" in message.text or (message.reply_to_message and message.reply_to_message.from_user.id == bot.get_me().id):
             if user_id not in ADMIN_IDS:
                 try: bot.reply_to(message, random.choice(MENTION_REPLIES))
@@ -116,11 +130,13 @@ def getMessage():
         if user_id in ADMIN_IDS: 
             return "!", 200
 
-        # 4. فلترة الرسائل ونظام الإنذارات (3 إنذارات = طرد)
+        # ==========================================
+        # 3. فلترة رسائل الأعضاء العاديين
+        # ==========================================
         violation = False
         warning_msg = ""
 
-        # أ. فحص القناة
+        # أ. فحص الانضمام للقناة (إذا أرسل رسالة وهو مو منضم)
         try:
             member = bot.get_chat_member(FORCE_CHANNEL, user_id)
             if member.status in ['left', 'kicked']:
@@ -132,19 +148,21 @@ def getMessage():
         if re.search(r'(https?://|t\.me/|www\.)', message.text, re.IGNORECASE):
             violation = True
             warning_msg = f"🚫 {user_mention}، إرسال الروابط ممنوع!"
-
         # ج. فحص الكلمات
         elif any(word.lower() in text_lower for word in BANNED_WORDS):
             violation = True
             warning_msg = f"🚫 {user_mention}، يرجى الالتزام بآداب الحوار!"
 
-        # تطبيق الإنذار (مع شبكة أمان للحذف)
+        # تطبيق الإنذار
         if violation:
-            try:
-                bot.delete_message(chat_id, message.message_id)
-            except: 
-                pass # هنا تم إخفاء الخطأ نهائياً
+            try: bot.delete_message(chat_id, message.message_id)
+            except: pass
 
+            current_time = time.time()
+            if user_id in warn_cooldown and current_time - warn_cooldown[user_id] < 60:
+                return "!", 200
+            
+            warn_cooldown[user_id] = current_time
             user_warnings[user_id] = user_warnings.get(user_id, 0) + 1
             
             if user_warnings[user_id] >= 3:
