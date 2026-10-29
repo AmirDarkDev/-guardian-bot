@@ -47,7 +47,9 @@ def getMessage():
         for member in update.message.new_chat_members:
             if member.is_bot: continue
             welcome_text = f"🇾🇪 أهلاً بك {member.first_name} في درع الظلام 🛡️\n⚠️ يجب عليك الانضمام لقناتنا أولاً: {FORCE_CHANNEL}\n\n🇬🇧 Welcome {member.first_name} to Dark Shield 🛡️\n⚠️ Join our channel: {FORCE_CHANNEL}"
-            bot.send_message(update.message.chat.id, welcome_text)
+            try:
+                bot.send_message(update.message.chat.id, welcome_text)
+            except: pass
         return "!", 200
 
     if update.message and update.message.text:
@@ -65,19 +67,24 @@ def getMessage():
                 btn_contact = InlineKeyboardButton("👨‍💻 المطور | Developer", url="https://t.me/AmirDarkDev")
                 markup.add(btn_add, btn_contact)
                 help_text = "🛡️ *درع الظلام | Dark Shield*\n\n🛠️ *أوامر الإدارة:*\n`/ban` - طرد\n`/mute` - كتم\n`/unmute` - فك كتم\n`/resetwarn` - مسح إنذارات العضو\n\n💵 السعر: 15$ | 📩 @AmirDarkDev"
-                bot.send_message(chat_id, help_text, parse_mode='Markdown', reply_markup=markup)
+                try:
+                    bot.send_message(chat_id, help_text, parse_mode='Markdown', reply_markup=markup)
+                except: pass
                 return "!", 200
 
             elif message.text.startswith('/ban') and message.reply_to_message:
-                bot.ban_chat_member(chat_id, message.reply_to_message.from_user.id)
+                try: bot.ban_chat_member(chat_id, message.reply_to_message.from_user.id)
+                except: pass
                 bot.reply_to(message, "✅ تم طرد العضو | User banned.")
                 return "!", 200
             elif message.text.startswith('/mute') and message.reply_to_message:
-                bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=False))
+                try: bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=False))
+                except: pass
                 bot.reply_to(message, "🔇 تم كتم العضو | User muted.")
                 return "!", 200
             elif message.text.startswith('/unmute') and message.reply_to_message:
-                bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True))
+                try: bot.restrict_chat_member(chat_id, message.reply_to_message.from_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True))
+                except: pass
                 bot.reply_to(message, "🔊 تم فك الكتم | User unmuted.")
                 return "!", 200
             elif message.text.startswith('/resetwarn') and message.reply_to_message:
@@ -88,12 +95,14 @@ def getMessage():
         # 2. الردود التلقائية (Auto-Replies)
         for trigger, response in AUTO_REPLIES.items():
             if trigger.lower() in text_lower:
-                bot.reply_to(message, response)
+                try: bot.reply_to(message, response)
+                except: pass
 
-        # 3. الرد الذكي على المنشن (Mention Reply) - ميزة مدفوعة
+        # 3. الرد الذكي على المنشن (Mention Reply)
         if f"@{bot.get_me().username}" in message.text or (message.reply_to_message and message.reply_to_message.from_user.id == bot.get_me().id):
             if user_id not in ADMIN_IDS:
-                bot.reply_to(message, random.choice(MENTION_REPLIES))
+                try: bot.reply_to(message, random.choice(MENTION_REPLIES))
+                except: pass
                 return "!", 200
 
         # تجاهل الأدمن
@@ -122,20 +131,25 @@ def getMessage():
             violation = True
             warning_msg = f"🚫 {user_mention}، يرجى الالتزام بآداب الحوار!"
 
-        # تطبيق الإنذار
+        # تطبيق الإنذار (مع شبكة أمان للحذف)
         if violation:
-            bot.delete_message(chat_id, message.message_id)
+            try:
+                bot.delete_message(chat_id, message.message_id)
+            except Exception as e:
+                print(f"[!] Delete Error: {e}", flush=True) # لو الرسالة محذوفة، البوت يكمل عادي
+
             user_warnings[user_id] = user_warnings.get(user_id, 0) + 1
             
             if user_warnings[user_id] >= 3:
-                # الطرد عند 3 إنذارات
                 try:
                     bot.ban_chat_member(chat_id, user_id)
                     bot.send_message(chat_id, f"🚷 {user_mention} تم طرده لتجاوزه 3 إنذارات.\n🚷 {user_mention} has been banned (3 warnings).")
                     user_warnings[user_id] = 0
                 except: pass
             else:
-                bot.send_message(chat_id, f"{warning_msg}\n⚠️ إنذار {user_warnings[user_id]}/3 | Warning {user_warnings[user_id]}/3")
+                try:
+                    bot.send_message(chat_id, f"{warning_msg}\n⚠️ إنذار {user_warnings[user_id]}/3 | Warning {user_warnings[user_id]}/3")
+                except: pass
             return "!", 200
 
     return "!", 200
