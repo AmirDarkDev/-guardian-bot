@@ -13,7 +13,15 @@ FORCE_CHANNEL = "@AmirDarkChannel"
 BANNED_WORDS = ["سبام", "scam", "نصب", "bot", "قمار"]
 
 # ==========================================
-# [ الردود التلقائية - لأي شخص ]
+# [ البوتات المسموح لها بالدخول ]
+# ==========================================
+WHITELIST_BOTS = [
+    "@BaarxXxbot",     # بوت الأغاني
+    "@ameraldlembot"   # بوتك
+]
+
+# ==========================================
+# [ الردود التلقائية ]
 # ==========================================
 AUTO_REPLIES = {
     "مرحبا": "أهلاً وسهلاً بك في درع الظلام 🛡️ كيف أقدر أساعدك؟",
@@ -55,8 +63,28 @@ def getMessage():
     json_string = request.get_data().decode('utf-8')
     update = telebot.types.Update.de_json(json_string)
     
+    # ==========================================
+    # 1. نظام صائد البوتات والترحيب
+    # ==========================================
     if update.message and update.message.new_chat_members:
         for member in update.message.new_chat_members:
+            
+            # أ. فحص البوتات
+            if member.is_bot:
+                if member.username and f"@{member.username}" in WHITELIST_BOTS:
+                    # البوت مسموح (بوت أغاني)
+                    try:
+                        bot.send_message(update.message.chat.id, f"🎵 أهلاً بك يا {member.first_name}، تم السماح لك بالدخول.")
+                    except: pass
+                else:
+                    # البوت ممنوع (منافس)
+                    try:
+                        bot.ban_chat_member(update.message.chat.id, member.id)
+                        bot.send_message(update.message.chat.id, f"🤖 تم طرد البوت {member.first_name} تلقائياً. درع الظلام هو الحارس الوحيد هنا.")
+                    except: pass
+                continue
+
+            # ب. ترحيب الأعضاء العاديين
             if member.is_bot: continue
             welcome_text = f"🇾🇪 أهلاً وسهلاً بك {member.first_name} في درع الظلام 🛡️\n\n⚠️ للتمكن من المشاركة، يرجى الانضمام إلى قناتنا الرسمية أولاً:\n👉 {FORCE_CHANNEL}\n\n🇬🇧 Welcome {member.first_name} to Dark Shield 🛡️\n⚠️ You must join our channel to chat:\n👉 {FORCE_CHANNEL}"
             try: bot.send_message(update.message.chat.id, welcome_text)
@@ -76,7 +104,7 @@ def getMessage():
             btn_add = InlineKeyboardButton("➕ أضفني لمجموعتك | Add to Group", url="https://t.me/ameraldlembot?startgroup=true")
             btn_contact = InlineKeyboardButton("👨‍💻 المطور | Developer", url="https://t.me/AmirDarkDev")
             markup.add(btn_add, btn_contact)
-            help_text = "🛡️ *أهلاً بك في بوت درع الظلام* 🛡️\n\n✨ *المميزات:*\n🚫 حذف الروابط\n🛑 منع الكلمات الممنوعة\n🔒 الانضمام الإجباري\n⚠️ نظام إنذارات (3 إنذارات = كتم 10 دقائق)\n🤖 ردود تلقائية لأي شخص (عربي/إنجليزي)\n💬 رد فوري عند المنشن\n🤫 *ميزة الهمس:* رد على رسالة الشخص واكتب `/whisper رسالتك`\n\n🛠️ *أوامر الإدارة:*\n`/ban` - طرد\n`/mute` - كتم\n`/unmute` - فك كتم\n`/resetwarn` - مسح إنذارات\n\n💵 *السعر:* 15$ | 📩 @AmirDarkDev"
+            help_text = "🛡️ *أهلاً بك في بوت درع الظلام* 🛡️\n\n✨ *المميزات:*\n🚫 حذف الروابط\n🛑 منع الكلمات الممنوعة\n🔒 الانضمام الإجباري\n⚠️ نظام إنذارات (3 إنذارات = كتم 10 دقائق)\n🤖 طرد البوتات المنافسة تلقائياً\n🤖 ردود تلقائية لأي شخص\n💬 رد فوري عند المنشن\n🤫 *ميزة الهمس:* رد على رسالة الشخص واكتب `/whisper رسالتك`\n\n🛠️ *أوامر الإدارة:*\n`/ban` - طرد\n`/mute` - كتم\n`/unmute` - فك كتم\n`/resetwarn` - مسح إنذارات\n\n💵 *السعر:* 15$ | 📩 @AmirDarkDev"
             try: bot.send_message(chat_id, help_text, parse_mode='Markdown', reply_markup=markup)
             except: pass
             return "!", 200
@@ -124,7 +152,7 @@ def getMessage():
                 except: pass
                 return "!", 200
 
-        # 3. الردود التلقائية لأي شخص
+        # 3. الردود التلقائية
         for trigger, response in AUTO_REPLIES.items():
             if trigger.lower() in text_lower:
                 try: bot.reply_to(message, response)
